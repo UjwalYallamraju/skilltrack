@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { supabase } from './lib/supabase'
-import Auth, { SetNewPassword } from './pages/Auth'
+import { useAuth, useClerk, useUser } from '@clerk/react'
+import { supabase, setTokenGetter } from './lib/supabase'
+import Auth, { NoAccess } from './pages/Auth'
 import MyGoals from './pages/MyGoals'
 import Dashboard from './pages/Dashboard'
 import Members from './pages/Members'
@@ -32,36 +33,35 @@ function usePage() {
 }
 
 export default function App() {
-  const [session, setSession] = useState(undefined)
-  const [recovering, setRecovering] = useState(false)
+  const { isLoaded, isSignedIn, userId, getToken } = useAuth()
+  const { user } = useUser()
+  const { signOut } = useClerk()
   const [profile, setProfile] = useState(null)
+  const [denied, setDenied] = useState(null)
   const page = usePage()
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data.session))
-    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
-      if (event === 'PASSWORD_RECOVERY') setRecovering(true)
-      setSession(s)
-    })
-    return () => sub.subscription.unsubscribe()
-  }, [])
+  // Every Supabase request carries the Clerk session token
+  useEffect(() => { setTokenGetter(() => getToken()) }, [getToken])
 
+  // Fetch (or create on first sign-in) my SkillTrack profile
   const loadProfile = useCallback(async () => {
-    if (!session) return setProfile(null)
-    const { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).single()
-    const memberships = data ? await getMyMemberships(data.id).catch(() => []) : []
-    setProfile(data && {
+    if (!isSignedIn) { setProfile(null); setDenied(null); return }
+    const { data, error } = await supabase.rpc('ensure_profile', { p_full_name: user?.fullName || '' })
+    if (error) { setDenied(error.message); setProfile(null); return }
+    const memberships = await getMyMemberships(data.id).catch(() => [])
+    setDenied(null)
+    setProfile({
       ...data, memberships,
       groupNames: memberships.map((m) => m.group?.name).filter(Boolean),
       leadGroupIds: memberships.filter((m) => m.is_lead).map((m) => m.group_id),
     })
-  }, [session])
+  }, [isSignedIn, userId, user?.fullName])
 
   useEffect(() => { loadProfile() }, [loadProfile])
 
-  if (session === undefined) return <Spinner />
-  if (recovering) return <SetNewPassword onDone={() => setRecovering(false)} />
-  if (!session) return <Auth />
+  if (!isLoaded) return <Spinner />
+  if (!isSignedIn) return <Auth />
+  if (denied) return <NoAccess message={denied} onSignOut={() => signOut()} />
   if (!profile) return <Spinner />
 
   const isAdmin = profile.role === 'admin'
@@ -89,7 +89,7 @@ export default function App() {
         <div className="mt-auto pt-4 px-3 border-t border-night-2 text-[13px] text-[#B4B9C6]">
           Signed in as
           <div className="text-white font-semibold">{profile.full_name || profile.email} {isAdmin ? '(Admin)' : isLead ? '(Group lead)' : ''}</div>
-          <button onClick={() => supabase.auth.signOut()} className="mt-3 text-[#B4B9C6] hover:text-white underline cursor-pointer bg-transparent border-0 p-0 text-[13px]">Sign out</button>
+          <button onClick={() => signOut()} className="mt-3 text-[#B4B9C6] hover:text-white underline cursor-pointer bg-transparent border-0 p-0 text-[13px]">Sign out</button>
         </div>
       </nav>
       <main className="flex-[999_1_560px] min-w-0 px-5 md:px-10 py-8">
