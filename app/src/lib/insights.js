@@ -54,10 +54,12 @@ export function groupsOf(userId, groups) {
 export function buildIndex(data, today = todayIST()) {
   const solvesByDay = new Map() // `${user}|${day}` -> count
   const lastSolve = new Map()
+  const firstSolve = new Map()
   for (const s of data.solves) {
     const k = `${s.user_id}|${s.solved_on}`
     solvesByDay.set(k, (solvesByDay.get(k) || 0) + 1)
     if (!lastSolve.has(s.user_id) || s.solved_on > lastSolve.get(s.user_id)) lastSolve.set(s.user_id, s.solved_on)
+    if (!firstSolve.has(s.user_id) || s.solved_on < firstSolve.get(s.user_id)) firstSolve.set(s.user_id, s.solved_on)
   }
   const lastUpdate = new Map()
   for (const u of data.updates) {
@@ -77,12 +79,20 @@ export function buildIndex(data, today = todayIST()) {
     lastUpdate: (u) => lastUpdate.get(u) || null,
     goalsOf: (u) => goalsBy.get(u) || [],
     actionsOf: (u) => actionsBy.get(u) || [],
+    startOf: (p) => trackingStart(p, firstSolve.get(p.id)),
   }
+}
+
+// Tracking starts on the day someone joined SkillTrack or their first synced problem,
+// whichever is earlier (LeetCode history synced on sign-up counts too).
+export function trackingStart(p, firstSolve) {
+  const joined = istDay(p.created_at)
+  return firstSolve && firstSolve < joined ? firstSolve : joined
 }
 
 export function personStats(p, idx) {
   const { today } = idx
-  const joined = istDay(p.created_at)
+  const joined = idx.startOf(p)
   const goals = idx.goalsOf(p.id)
   const actions = idx.actionsOf(p.id)
   const lc = idx.lcBy.get(p.id)
@@ -156,7 +166,7 @@ export function consistency(list, from, to, idx) {
   for (let d = from; d <= to; d = addDays(d, 1)) {
     if (isWeekend(d)) continue
     for (const p of list) {
-      if (p.daily_target <= 0 || d < istDay(p.created_at)) continue
+      if (p.daily_target <= 0 || d < idx.startOf(p)) continue
       slots++
       if (idx.solved(p.id, d) >= p.daily_target) met++
     }
