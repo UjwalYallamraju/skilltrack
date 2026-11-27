@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { download, getGoals, getGroups, getProfiles, getRecentGoalUpdates, getSolvesSince, toCsv } from '../lib/data'
+import { useMemo, useState } from 'react'
+import { download, toCsv } from '../lib/data'
+import { useMe } from '../lib/me'
+import { useTeamData } from '../lib/queries'
 import { addDays, fmtDate, istDay, isWeekend, todayIST } from '../lib/dates'
 import { Button, ErrorNote, Kpi, Spinner } from '../components/ui'
 import { BarChart, LineChart, Legend, NEUTRAL, ORDINAL_BLUE, SERIES } from '../components/Charts'
 
-const HISTORY_DAYS = 190 // ~6 months of data is loaded once
 const DIFFS = [
   { key: 'Easy', color: ORDINAL_BLUE[0] },
   { key: 'Medium', color: ORDINAL_BLUE[1] },
@@ -23,24 +24,17 @@ const lastDayOfMonth = (key) => {
 }
 const pct = (v) => (v == null ? '—' : `${Math.round(v)}%`)
 
-export default function Reports({ profile }) {
-  const [data, setData] = useState(null)
-  const [error, setError] = useState(null)
+export default function Reports() {
+  const { profile } = useMe()
+  const team = useTeamData()
+  const error = team.error
+  const data = useMemo(() => team.data && { ...team.data, updates: team.data.updates.map((u) => ({ ...u, day: istDay(u.created_at) })) }, [team.data])
   const [group, setGroup] = useState('all')
   const [weeks, setWeeks] = useState(12)
   const today = todayIST()
   const [month, setMonth] = useState(monthKey(today))
   const isAdmin = profile.role === 'admin'
 
-  const load = useCallback(async () => {
-    try {
-      const [people, groups, goals, solves, updates] = await Promise.all([
-        getProfiles(), getGroups(), getGoals(), getSolvesSince(HISTORY_DAYS), getRecentGoalUpdates(HISTORY_DAYS),
-      ])
-      setData({ people, groups, goals, solves, updates: updates.map((u) => ({ ...u, day: istDay(u.created_at) })) })
-    } catch (e) { setError(e) }
-  }, [])
-  useEffect(() => { load() }, [load])
 
   const ctx = useMemo(() => {
     if (!data) return null
@@ -167,7 +161,7 @@ export default function Reports({ profile }) {
     <div className="flex flex-col gap-6">
       <header className="flex flex-wrap gap-4 items-end justify-between">
         <div>
-          <h1 className="m-0 font-display text-3xl">Reports</h1>
+          <h1 className="m-0 text-[26px] leading-tight font-semibold tracking-tight">Reports</h1>
           <p className="mt-1.5 mb-0 text-muted text-sm">Trends over time and a monthly summary · {groupName} · {people.length} trainer{people.length === 1 ? '' : 's'}</p>
         </div>
         {data.groups.length > 0 && (
@@ -239,7 +233,7 @@ export default function Reports({ profile }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4">
           <Kpi label="LeetCode problems" value={total('solved')} />
           <Kpi label="Weekdays on target" value={pct(teamC.pct)} />
           <Kpi label="Goals completed" value={total('done')} />
