@@ -8,6 +8,7 @@ import Members from './pages/Members'
 import Profile from './pages/Profile'
 import Groups from './pages/Groups'
 import Daily from './pages/Daily'
+import Reports from './pages/Reports'
 import { getMyMemberships } from './lib/data'
 import { Spinner } from './components/ui'
 
@@ -16,6 +17,7 @@ const PAGES = {
   goals: { label: 'My Goals', component: MyGoals, access: 'all' },
   team: { label: 'Team Dashboard', component: Dashboard, access: 'all' },
   daily: { label: 'Daily Progress', component: Daily, access: 'all' },
+  reports: { label: 'Reports', component: Reports, access: 'all' },
   groups: { label: 'Groups', component: Groups, access: 'admin' },
   members: { label: 'Team Members', component: Members, access: 'lead' },
   profile: { label: 'My Profile', component: Profile, access: 'all' },
@@ -70,11 +72,11 @@ export default function App() {
   const defaultPage = isAdmin ? 'team' : 'goals'
   const key = allowed(page) ? page : defaultPage
   const Page = PAGES[key].component
-  const navOrder = (isAdmin ? ['team', 'daily', 'goals', 'groups', 'members', 'profile'] : ['goals', 'team', 'daily', 'members', 'profile']).filter(allowed)
+  const navOrder = (isAdmin ? ['team', 'daily', 'reports', 'goals', 'groups', 'members', 'profile'] : ['goals', 'team', 'daily', 'reports', 'members', 'profile']).filter(allowed)
 
   return (
     <div className="min-h-screen flex flex-wrap">
-      <nav aria-label="Main" className="flex-[1_1_220px] max-w-[260px] max-md:max-w-none bg-night text-[#E6E8EE] px-4 py-6 flex flex-col gap-1 md:min-h-screen">
+      <nav aria-label="Main" className="no-print flex-[1_1_220px] max-w-[260px] max-md:max-w-none bg-night text-[#E6E8EE] px-4 py-6 flex flex-col gap-1 md:min-h-screen">
         <div className="font-display font-bold text-xl px-3 pb-6">SkillTrack</div>
         {navOrder.map((k) => (
           <a

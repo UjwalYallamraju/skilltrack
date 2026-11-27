@@ -34,3 +34,12 @@ textarea.input { height: auto; padding: 10px 12px; }
 .input:focus { outline: 2px solid var(--color-accent); outline-offset: -1px; }
 .label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 500; }
 .card { background: #fff; border: 1px solid var(--color-line); border-radius: 12px; }
+
+/* Print / Save as PDF: hide navigation and controls, keep cards intact */
+@media print {
+  .no-print, details > summary { display: none !important; }
+  body { background: #fff; }
+  main { padding: 0 !important; }
+  .card { break-inside: avoid; }
+  .print-break { break-after: page; }
+}

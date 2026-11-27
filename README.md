@@ -19,6 +19,10 @@ Live site: https://skilltrack-ruby.vercel.app
 - Trainers see only the people who share a group with them. The admin sees everyone.
 - Group leads see their groups and can set daily LeetCode targets for their members on **Team Members**.
 
+## Reports
+- **Reports** page: weekly LeetCode problems (by difficulty), weekly "days on target", goals completed per month.
+- Monthly report per group: totals, a "needs attention" list, per-trainer table; download as CSV or print / save as PDF.
+
 ## Change the website
 ```bash
 cd app
