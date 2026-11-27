@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { download, toCsv } from '../lib/data'
 import { useMe } from '../lib/me'
 import { useTeamData } from '../lib/queries'
+import { trackingStart } from '../lib/insights'
 import { addDays, fmtDate, istDay, isWeekend, todayIST } from '../lib/dates'
 import { Button, ErrorNote, Kpi, Spinner } from '../components/ui'
 import { BarChart, LineChart, Legend, NEUTRAL, ORDINAL_BLUE, SERIES } from '../components/Charts'
@@ -43,9 +44,13 @@ export default function Reports() {
     const people = data.people.filter((p) =>
       (p.role === 'trainer' || data.goals.some((g) => g.user_id === p.id) || data.solves.some((s) => s.user_id === p.id)) &&
       (!inGroup || inGroup.has(p.id)))
-    const joined = Object.fromEntries(people.map((p) => [p.id, istDay(p.created_at)]))
     const solvesBy = {}
-    for (const s of data.solves) (solvesBy[`${s.user_id}|${s.solved_on}`] ||= []).push(s)
+    const firstSolve = {}
+    for (const s of data.solves) {
+      (solvesBy[`${s.user_id}|${s.solved_on}`] ||= []).push(s)
+      if (!firstSolve[s.user_id] || s.solved_on < firstSolve[s.user_id]) firstSolve[s.user_id] = s.solved_on
+    }
+    const joined = Object.fromEntries(people.map((p) => [p.id, trackingStart(p, firstSolve[p.id])]))
     const solvedOn = (uid, d) => (solvesBy[`${uid}|${d}`] || []).length
 
     // Share of (trainer × weekday) slots where the trainer hit their daily target
@@ -287,7 +292,7 @@ export default function Reports() {
             </tbody>
           </table>
         </article>
-        <p className="m-0 text-xs text-muted">“Weekdays on target” counts Monday–Friday from the day each trainer joined. LeetCode history covers the last ~6 months.</p>
+        <p className="m-0 text-xs text-muted">“Weekdays on target” counts Monday–Friday from each trainer’s first tracked day: when they joined or their first synced problem, whichever is earlier. LeetCode history covers the last ~6 months.</p>
       </section>
     </div>
   )
