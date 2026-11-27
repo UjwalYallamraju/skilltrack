@@ -1,25 +1,27 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { download, getGoalUpdates, getGoals, getLeetcodeSummary, getProfiles, getSkillAreas, getSolvesSince, toCsv } from '../lib/data'
+import { download, getGoalUpdates, getGoals, getGroups, getLeetcodeSummary, getProfiles, getSkillAreas, getSolvesSince, toCsv } from '../lib/data'
 import { addDays, daysBetween, fmtDate, fmtDateTime, todayIST } from '../lib/dates'
 import { Button, Empty, ErrorNote, Kpi, Modal, Spinner, STATUS, StatusBadge } from '../components/ui'
 import GoalCard, { statusNote } from '../components/GoalCard'
 import { SevenDayBars, lastSevenDays } from '../components/LeetCodeCard'
 
+const slug = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 const STATUS_ORDER = ['overdue', 'at_risk', 'on_track', 'not_started', 'completed']
 
 export default function Dashboard({ profile }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const [area, setArea] = useState('all')
+  const [group, setGroup] = useState('all')
   const [openTrainer, setOpenTrainer] = useState(null)
   const isAdmin = profile.role === 'admin'
 
   const load = useCallback(async () => {
     try {
-      const [areas, people, goals, lc, solves] = await Promise.all([
-        getSkillAreas(), getProfiles(), getGoals(), getLeetcodeSummary(), getSolvesSince(7),
+      const [areas, people, goals, lc, solves, groups] = await Promise.all([
+        getSkillAreas(), getProfiles(), getGoals(), getLeetcodeSummary(), getSolvesSince(7), getGroups(),
       ])
-      setData({ areas, people, goals, lc, solves })
+      setData({ areas, people, goals, lc, solves, groups })
     } catch (e) { setError(e) }
   }, [])
   useEffect(() => { load() }, [load])
@@ -27,14 +29,16 @@ export default function Dashboard({ profile }) {
   const view = useMemo(() => {
     if (!data) return null
     const today = todayIST()
-    const goals = area === 'all' ? data.goals : data.goals.filter((g) => String(g.skill_area_id) === area)
+    // people shown: trainers, plus anyone (e.g. admin) who has goals; narrowed to the chosen group
+    const inGroup = group === 'all' ? null : new Set((data.groups.find((g) => g.id === group)?.members || []).map((m) => m.user_id))
+    const people = data.people.filter((p) => (p.role === 'trainer' || data.goals.some((g) => g.user_id === p.id)) && (!inGroup || inGroup.has(p.id)))
+    const ids = new Set(people.map((p) => p.id))
+    const goals = data.goals.filter((g) => ids.has(g.user_id) && (area === 'all' || String(g.skill_area_id) === area))
     const areas = area === 'all' ? data.areas : data.areas.filter((a) => String(a.id) === area)
     const active = goals.filter((g) => g.status !== 'completed')
     const m = Number(today.slice(5, 7))
     const qStart = `${today.slice(0, 4)}-${String(m - ((m - 1) % 3)).padStart(2, '0')}-01`
     const count = (s) => goals.filter((g) => g.status === s).length
-    // people shown: trainers, plus anyone (e.g. admin) who has goals
-    const people = data.people.filter((p) => p.role === 'trainer' || data.goals.some((g) => g.user_id === p.id))
     return {
       today, goals, areas, people,
       kpis: [
@@ -48,11 +52,13 @@ export default function Dashboard({ profile }) {
       attention: active.filter((g) => g.status === 'overdue' || g.status === 'at_risk')
         .sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status) || a.target_date.localeCompare(b.target_date)),
     }
-  }, [data, area])
+  }, [data, area, group])
 
   if (error) return <ErrorNote error={error} />
   if (!view) return <Spinner />
 
+  const groupNames = (userId) => data.groups.filter((g) => g.members.some((m) => m.user_id === userId)).map((g) => g.name)
+  const groupLabel = group === 'all' ? (isAdmin ? 'all groups' : data.groups.length === 1 ? data.groups[0].name : 'your groups') : data.groups.find((g) => g.id === group)?.name
   const lcRows = data.lc.filter((r) => view.people.some((p) => p.id === r.user_id))
   const solvedToday = lcRows.filter((r) => r.daily_target > 0 && r.today >= r.daily_target).length
   const weekTotal = lcRows.reduce((s, r) => s + r.last_7_days, 0)
@@ -60,6 +66,7 @@ export default function Dashboard({ profile }) {
   function exportCsv() {
     const csv = toCsv(view.goals, [
       { label: 'Trainer', get: (g) => g.owner_name },
+      { label: 'Groups', get: (g) => groupNames(g.user_id).join('; ') },
       { label: 'Skill area', get: (g) => g.skill_area },
       { label: 'Skill', get: (g) => g.skill },
       { label: 'Goal', get: (g) => g.title },
@@ -69,7 +76,7 @@ export default function Dashboard({ profile }) {
       { label: 'Status', get: (g) => STATUS[g.status]?.label },
       { label: 'Completed at', get: (g) => (g.completed_at ? g.completed_at.slice(0, 10) : '') },
     ])
-    download(`skilltrack-goals-${view.today}.csv`, csv)
+    download(`skilltrack-goals-${group === 'all' ? 'all' : slug(groupLabel)}-${view.today}.csv`, csv)
   }
 
   return (
@@ -77,9 +84,18 @@ export default function Dashboard({ profile }) {
       <header className="flex flex-wrap gap-4 items-end justify-between">
         <div>
           <h1 className="m-0 font-display text-3xl">Team Dashboard</h1>
-          <p className="mt-1.5 mb-0 text-muted text-sm">Upskilling goals and daily practice across {view.people.length} trainer{view.people.length === 1 ? '' : 's'}</p>
+          <p className="mt-1.5 mb-0 text-muted text-sm">Upskilling goals and daily practice across {view.people.length} trainer{view.people.length === 1 ? '' : 's'} · {groupLabel}</p>
+          {!isAdmin && data.groups.length === 0 && <p className="mt-2 mb-0 text-sm text-warn-fg bg-warn-bg rounded-lg px-3 py-2">You're not in a group yet, so you only see your own data. Ask your team lead to add you to a group.</p>}
         </div>
         <div className="flex flex-wrap gap-2 items-center">
+          {data.groups.length > 0 && (
+            <label className="text-[13px] text-muted flex items-center gap-2">Group
+              <select className="input w-auto" value={group} onChange={(e) => setGroup(e.target.value)}>
+                <option value="all">{isAdmin ? 'All groups' : 'All my groups'}</option>
+                {data.groups.map((g) => <option key={g.id} value={g.id}>{g.name} ({g.members.length})</option>)}
+              </select>
+            </label>
+          )}
           <label className="text-[13px] text-muted flex items-center gap-2">Skill area
             <select className="input w-auto" value={area} onChange={(e) => setArea(e.target.value)}>
               <option value="all">All areas</option>
@@ -99,7 +115,7 @@ export default function Dashboard({ profile }) {
           <h2 id="matrix-h" className="m-0 text-[17px] font-semibold">Who's working on what</h2>
           <Legend />
         </div>
-        {view.people.length === 0 ? <p className="text-sm text-muted mb-0">No trainers have signed up yet.</p> : (
+        {view.people.length === 0 ? <p className="text-sm text-muted mb-0">{group === 'all' ? 'No trainers have signed up yet.' : 'No trainers in this group yet.'}</p> : (
           <div className="overflow-x-auto mt-4">
             <table className="w-full border-collapse text-sm min-w-[760px]">
               <thead>
@@ -118,6 +134,7 @@ export default function Dashboard({ profile }) {
                     <tr key={p.id}>
                       <td className="py-3 px-2 border-b border-soft align-top">
                         <button onClick={() => setOpenTrainer(p)} className="font-semibold text-ink bg-transparent border-0 p-0 cursor-pointer hover:text-accent text-left">{p.full_name || p.email}</button>
+                        {groupNames(p.id).length > 0 && <div className="text-xs text-muted mt-0.5">{groupNames(p.id).join(', ')}</div>}
                       </td>
                       {view.areas.map((a) => {
                         const cell = mine.filter((g) => g.skill_area_id === a.id)
