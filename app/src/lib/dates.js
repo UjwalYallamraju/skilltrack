@@ -5,6 +5,11 @@ export function todayIST() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
 }
 
+// IST calendar day ('YYYY-MM-DD') of a timestamp
+export function istDay(timestamp) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(timestamp))
+}
+
 export function addDays(isoDate, n) {
   const d = new Date(isoDate + 'T00:00:00Z')
   d.setUTCDate(d.getUTCDate() + n)

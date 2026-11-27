@@ -24,6 +24,12 @@ export const getGoalUpdates = (goalIds) =>
     ? q(supabase.from('goal_updates').select('*').in('goal_id', goalIds).order('created_at', { ascending: false }))
     : Promise.resolve([])
 
+// Progress updates logged in the last N days (IST), with the goal they belong to
+export const getRecentGoalUpdates = (days) =>
+  q(supabase.from('goal_updates').select('*, goal:goals(title, skill)')
+    .gte('created_at', new Date(addDays(todayIST(), -(days - 1)) + 'T00:00:00+05:30').toISOString())
+    .order('created_at', { ascending: false }))
+
 export const saveGoal = (goal) => {
   const { id, ...fields } = goal
   return id

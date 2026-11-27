@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard'
 import Members from './pages/Members'
 import Profile from './pages/Profile'
 import Groups from './pages/Groups'
+import Daily from './pages/Daily'
 import { getMyMemberships } from './lib/data'
 import { Spinner } from './components/ui'
 
@@ -13,6 +14,7 @@ import { Spinner } from './components/ui'
 const PAGES = {
   goals: { label: 'My Goals', component: MyGoals, access: 'all' },
   team: { label: 'Team Dashboard', component: Dashboard, access: 'all' },
+  daily: { label: 'Daily Progress', component: Daily, access: 'all' },
   groups: { label: 'Groups', component: Groups, access: 'admin' },
   members: { label: 'Team Members', component: Members, access: 'lead' },
   profile: { label: 'My Profile', component: Profile, access: 'all' },
@@ -68,7 +70,7 @@ export default function App() {
   const defaultPage = isAdmin ? 'team' : 'goals'
   const key = allowed(page) ? page : defaultPage
   const Page = PAGES[key].component
-  const navOrder = (isAdmin ? ['team', 'goals', 'groups', 'members', 'profile'] : ['goals', 'team', 'members', 'profile']).filter(allowed)
+  const navOrder = (isAdmin ? ['team', 'daily', 'goals', 'groups', 'members', 'profile'] : ['goals', 'team', 'daily', 'members', 'profile']).filter(allowed)
 
   return (
     <div className="min-h-screen flex flex-wrap">
