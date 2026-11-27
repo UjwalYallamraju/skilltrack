@@ -1,38 +1,23 @@
-import { useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth, useClerk, useUser } from '@clerk/react'
-import { supabase, setTokenGetter } from './lib/supabase'
+import { setTokenGetter } from './lib/supabase'
+import { ensureProfile, getMyMemberships } from './lib/data'
+import { MeContext } from './lib/me'
+import { queryClient } from './lib/queries'
 import Auth, { NoAccess } from './pages/Auth'
-import MyGoals from './pages/MyGoals'
-import Dashboard from './pages/Dashboard'
-import Members from './pages/Members'
-import Profile from './pages/Profile'
-import Groups from './pages/Groups'
-import Daily from './pages/Daily'
-import Reports from './pages/Reports'
-import { getMyMemberships } from './lib/data'
-import { Spinner } from './components/ui'
+import Shell from './components/Shell'
+import { PageSkeleton } from './components/ui'
 
-// access: 'all' | 'admin' | 'lead' (admins and group leads)
-const PAGES = {
-  goals: { label: 'My Goals', component: MyGoals, access: 'all' },
-  team: { label: 'Team Dashboard', component: Dashboard, access: 'all' },
-  daily: { label: 'Daily Progress', component: Daily, access: 'all' },
-  reports: { label: 'Reports', component: Reports, access: 'all' },
-  groups: { label: 'Groups', component: Groups, access: 'admin' },
-  members: { label: 'Team Members', component: Members, access: 'lead' },
-  profile: { label: 'My Profile', component: Profile, access: 'all' },
-}
-
-function usePage() {
-  const read = () => (window.location.hash.replace('#/', '') || '').split('?')[0]
-  const [page, setPage] = useState(read)
-  useEffect(() => {
-    const on = () => setPage(read())
-    window.addEventListener('hashchange', on)
-    return () => window.removeEventListener('hashchange', on)
-  }, [])
-  return page
-}
+const Today = lazy(() => import('./pages/Today'))
+const Team = lazy(() => import('./pages/Team'))
+const Person = lazy(() => import('./pages/Person'))
+const Approvals = lazy(() => import('./pages/Approvals'))
+const MyWork = lazy(() => import('./pages/MyWork'))
+const Reports = lazy(() => import('./pages/Reports'))
+const LeetCode = lazy(() => import('./pages/LeetCode'))
+const Settings = lazy(() => import('./pages/Settings'))
+const Profile = lazy(() => import('./pages/Profile'))
 
 export default function App() {
   const { isLoaded, isSignedIn, userId, getToken } = useAuth()
@@ -40,7 +25,6 @@ export default function App() {
   const { signOut } = useClerk()
   const [profile, setProfile] = useState(null)
   const [denied, setDenied] = useState(null)
-  const page = usePage()
 
   // Every Supabase request carries the Clerk session token
   useEffect(() => { setTokenGetter(() => getToken()) }, [getToken])
@@ -48,55 +32,67 @@ export default function App() {
   // Fetch (or create on first sign-in) my SkillTrack profile
   const loadProfile = useCallback(async () => {
     if (!isSignedIn) { setProfile(null); setDenied(null); return }
-    const { data, error } = await supabase.rpc('ensure_profile', { p_full_name: user?.fullName || '' })
-    if (error) { setDenied(error.message); setProfile(null); return }
-    const memberships = await getMyMemberships(data.id).catch(() => [])
-    setDenied(null)
-    setProfile({
-      ...data, memberships,
-      groupNames: memberships.map((m) => m.group?.name).filter(Boolean),
-      leadGroupIds: memberships.filter((m) => m.is_lead).map((m) => m.group_id),
-    })
+    try {
+      const data = await ensureProfile(user?.fullName)
+      const memberships = await getMyMemberships(data.id).catch(() => [])
+      setDenied(null)
+      setProfile({
+        ...data,
+        groupNames: memberships.map((m) => m.group?.name).filter(Boolean),
+        leadGroupIds: memberships.filter((m) => m.is_lead).map((m) => m.group_id),
+      })
+    } catch (e) {
+      setDenied(e.message); setProfile(null)
+    }
   }, [isSignedIn, userId, user?.fullName])
-
   useEffect(() => { loadProfile() }, [loadProfile])
 
-  if (!isLoaded) return <Spinner />
+  // Admins and group leads are trainers too: they can switch to the trainer view
+  const [mode, setModeState] = useState(() => { try { return localStorage.getItem('skilltrack-mode') || 'manager' } catch { return 'manager' } })
+  const setMode = useCallback((m) => { setModeState(m); try { localStorage.setItem('skilltrack-mode', m) } catch { /* ignore */ } }, [])
+
+  const me = useMemo(() => {
+    if (!profile) return null
+    const realAdmin = profile.role === 'admin'
+    const realLead = profile.leadGroupIds.length > 0
+    const canManage = realAdmin || realLead
+    const trainerView = canManage && mode === 'trainer'
+    return {
+      profile,
+      isAdmin: realAdmin && !trainerView,
+      isLead: realLead && !trainerView,
+      isManager: canManage && !trainerView,
+      canManage, realAdmin, realLead, mode: trainerView ? 'trainer' : 'manager', setMode,
+      reloadProfile: loadProfile,
+      signOut: () => { queryClient.clear(); signOut() },
+    }
+  }, [profile, loadProfile, signOut, mode, setMode])
+
+  if (!isLoaded) return <div className="p-10"><PageSkeleton /></div>
   if (!isSignedIn) return <Auth />
   if (denied) return <NoAccess message={denied} onSignOut={() => signOut()} />
-  if (!profile) return <Spinner />
+  if (!me) return <div className="p-10"><PageSkeleton /></div>
 
-  const isAdmin = profile.role === 'admin'
-  const isLead = profile.leadGroupIds.length > 0
-  const allowed = (k) => PAGES[k] && (PAGES[k].access === 'all' || isAdmin || (PAGES[k].access === 'lead' && isLead))
-  const defaultPage = isAdmin ? 'team' : 'goals'
-  const key = allowed(page) ? page : defaultPage
-  const Page = PAGES[key].component
-  const navOrder = (isAdmin ? ['team', 'daily', 'reports', 'goals', 'groups', 'members', 'profile'] : ['goals', 'team', 'daily', 'reports', 'members', 'profile']).filter(allowed)
-
+  const home = me.isManager ? '/today' : '/my'
   return (
-    <div className="min-h-screen flex flex-wrap">
-      <nav aria-label="Main" className="no-print flex-[1_1_220px] max-w-[260px] max-md:max-w-none bg-night text-[#E6E8EE] px-4 py-6 flex flex-col gap-1 md:min-h-screen">
-        <div className="font-display font-bold text-xl px-3 pb-6">SkillTrack</div>
-        {navOrder.map((k) => (
-          <a
-            key={k}
-            href={`#/${k}`}
-            aria-current={k === key ? 'page' : undefined}
-            className={`px-3 py-3 rounded-lg text-sm no-underline ${k === key ? 'bg-night-2 text-white font-semibold' : 'text-[#B4B9C6] hover:text-white'}`}
-          >
-            {PAGES[k].label}
-          </a>
-        ))}
-        <div className="mt-auto pt-4 px-3 border-t border-night-2 text-[13px] text-[#B4B9C6]">
-          Signed in as
-          <div className="text-white font-semibold">{profile.full_name || profile.email} {isAdmin ? '(Admin)' : isLead ? '(Group lead)' : ''}</div>
-          <button onClick={() => signOut()} className="mt-3 text-[#B4B9C6] hover:text-white underline cursor-pointer bg-transparent border-0 p-0 text-[13px]">Sign out</button>
-        </div>
-      </nav>
-      <main className="flex-[999_1_560px] min-w-0 px-5 md:px-10 py-8">
-        <Page profile={profile} reloadProfile={loadProfile} />
-      </main>
-    </div>
+    <MeContext.Provider value={me}>
+      <Shell>
+        <Suspense fallback={<PageSkeleton />}>
+          <Routes>
+            <Route path="/" element={<Navigate to={home} replace />} />
+            <Route path="/today" element={me.isManager ? <Today /> : <Navigate to="/my" replace />} />
+            <Route path="/team" element={<Team />} />
+            <Route path="/people/:id" element={<Person />} />
+            <Route path="/approvals" element={me.isManager ? <Approvals /> : <Navigate to="/my" replace />} />
+            <Route path="/my" element={<MyWork />} />
+            <Route path="/leetcode" element={<LeetCode />} />
+            <Route path="/reports" element={<Reports />} />
+            <Route path="/settings/*" element={me.isManager ? <Settings /> : <Navigate to="/my" replace />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="*" element={<Navigate to={home} replace />} />
+          </Routes>
+        </Suspense>
+      </Shell>
+    </MeContext.Provider>
   )
 }
