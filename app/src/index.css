@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: Inter, system-ui, sans-serif;
+  --font-display: "Space Grotesk", Inter, sans-serif;
+  --color-ink: #1A1D24;
+  --color-muted: #5B6170;
+  --color-line: #E3E6EC;
+  --color-soft: #EEF0F4;
+  --color-canvas: #F6F7F9;
+  --color-night: #12151C;
+  --color-night-2: #2A2F3B;
+  --color-accent: #3B4BD8;
+  --color-accent-dark: #2A37A8;
+  --color-ok: #1F8A5B;
+  --color-ok-bg: #E3F4EC;
+  --color-ok-fg: #166A45;
+  --color-warn: #D9822B;
+  --color-warn-bg: #FCEFE0;
+  --color-warn-fg: #94520F;
+  --color-bad: #C23B3B;
+  --color-bad-bg: #FBE5E5;
+  --color-bad-fg: #9A2A2A;
+  --color-done-bg: #E6E9FB;
+}
+
+body { background: var(--color-canvas); color: var(--color-ink); }
+
+.input {
+  height: 44px; width: 100%; padding: 0 12px; border: 1px solid #D5D9E1; border-radius: 8px;
+  background: #fff; font: inherit; color: inherit;
+}
+textarea.input { height: auto; padding: 10px 12px; }
+.input:focus { outline: 2px solid var(--color-accent); outline-offset: -1px; }
+.label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 500; }
+.card { background: #fff; border: 1px solid var(--color-line); border-radius: 12px; }
