@@ -11,6 +11,12 @@ Live site: https://skilltrack-ruby.vercel.app
 | `supabase/functions/leetcode-sync/index.ts` | Edge Function that pulls public LeetCode stats + recent solved problems |
 | `supabase/schedule.sql` | Runs the sync every 2 hours (pg_cron) |
 | `supabase/make-admin.sql` | Promote a user to admin |
+| `supabase/migrations/002_groups.sql` | Groups: tables, group leads, and "see only your groups" rules |
+
+## Groups
+- The admin creates groups on the **Groups** page and adds trainers (a trainer can be in several groups).
+- Trainers see only the people who share a group with them. The admin sees everyone.
+- Group leads see their groups and can set daily LeetCode targets for their members on **Team Members**.
 
 ## Change the website
 ```bash

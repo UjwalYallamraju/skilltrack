@@ -34,7 +34,8 @@ export default function Profile({ profile, reloadProfile }) {
           <input className="input font-normal" value={lc} onChange={(e) => setLc(e.target.value)} placeholder="e.g. nehak_dev" />
           <span className="text-xs text-muted font-normal">Your profile must be public on LeetCode for the daily sync to work.</span>
         </label>
-        <div className="text-sm text-muted">Daily LeetCode target: <b className="text-ink">{profile.daily_target === 0 ? 'None' : `${profile.daily_target} a day`}</b> (set by your team lead)</div>
+        <div className="text-sm text-muted">Groups: <b className="text-ink">{profile.groupNames?.length ? profile.groupNames.join(', ') : 'Not in a group yet'}</b></div>
+        <div className="text-sm text-muted">Daily LeetCode target: <b className="text-ink">{profile.daily_target === 0 ? 'None' : `${profile.daily_target} a day`}</b> (set by your team lead or group lead)</div>
         <ErrorNote error={error} />
         {ok && <p className="m-0 text-sm text-ok-fg bg-ok-bg rounded-lg px-3 py-2">Saved.</p>}
         <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save profile'}</Button>

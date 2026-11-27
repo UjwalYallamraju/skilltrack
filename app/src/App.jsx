@@ -5,13 +5,17 @@ import MyGoals from './pages/MyGoals'
 import Dashboard from './pages/Dashboard'
 import Members from './pages/Members'
 import Profile from './pages/Profile'
+import Groups from './pages/Groups'
+import { getMyMemberships } from './lib/data'
 import { Spinner } from './components/ui'
 
+// access: 'all' | 'admin' | 'lead' (admins and group leads)
 const PAGES = {
-  goals: { label: 'My Goals', component: MyGoals },
-  team: { label: 'Team Dashboard', component: Dashboard },
-  members: { label: 'Team Members', component: Members, adminOnly: true },
-  profile: { label: 'My Profile', component: Profile },
+  goals: { label: 'My Goals', component: MyGoals, access: 'all' },
+  team: { label: 'Team Dashboard', component: Dashboard, access: 'all' },
+  groups: { label: 'Groups', component: Groups, access: 'admin' },
+  members: { label: 'Team Members', component: Members, access: 'lead' },
+  profile: { label: 'My Profile', component: Profile, access: 'all' },
 }
 
 function usePage() {
@@ -43,7 +47,12 @@ export default function App() {
   const loadProfile = useCallback(async () => {
     if (!session) return setProfile(null)
     const { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).single()
-    setProfile(data)
+    const memberships = data ? await getMyMemberships(data.id).catch(() => []) : []
+    setProfile(data && {
+      ...data, memberships,
+      groupNames: memberships.map((m) => m.group?.name).filter(Boolean),
+      leadGroupIds: memberships.filter((m) => m.is_lead).map((m) => m.group_id),
+    })
   }, [session])
 
   useEffect(() => { loadProfile() }, [loadProfile])
@@ -54,10 +63,12 @@ export default function App() {
   if (!profile) return <Spinner />
 
   const isAdmin = profile.role === 'admin'
+  const isLead = profile.leadGroupIds.length > 0
+  const allowed = (k) => PAGES[k] && (PAGES[k].access === 'all' || isAdmin || (PAGES[k].access === 'lead' && isLead))
   const defaultPage = isAdmin ? 'team' : 'goals'
-  const key = PAGES[page] && (!PAGES[page].adminOnly || isAdmin) ? page : defaultPage
+  const key = allowed(page) ? page : defaultPage
   const Page = PAGES[key].component
-  const navOrder = isAdmin ? ['team', 'goals', 'members', 'profile'] : ['goals', 'team', 'profile']
+  const navOrder = (isAdmin ? ['team', 'goals', 'groups', 'members', 'profile'] : ['goals', 'team', 'members', 'profile']).filter(allowed)
 
   return (
     <div className="min-h-screen flex flex-wrap">
@@ -75,7 +86,7 @@ export default function App() {
         ))}
         <div className="mt-auto pt-4 px-3 border-t border-night-2 text-[13px] text-[#B4B9C6]">
           Signed in as
-          <div className="text-white font-semibold">{profile.full_name || profile.email} {isAdmin ? '(Admin)' : ''}</div>
+          <div className="text-white font-semibold">{profile.full_name || profile.email} {isAdmin ? '(Admin)' : isLead ? '(Group lead)' : ''}</div>
           <button onClick={() => supabase.auth.signOut()} className="mt-3 text-[#B4B9C6] hover:text-white underline cursor-pointer bg-transparent border-0 p-0 text-[13px]">Sign out</button>
         </div>
       </nav>

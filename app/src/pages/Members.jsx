@@ -1,21 +1,26 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase, ALLOWED_DOMAIN } from '../lib/supabase'
-import { getProfiles, getSkillAreas, updateProfile } from '../lib/data'
+import { getGroups, getProfiles, getSkillAreas, updateProfile } from '../lib/data'
 import { fmtDate } from '../lib/dates'
 import { Button, ErrorNote, Spinner } from '../components/ui'
 
 export default function Members({ profile }) {
   const [people, setPeople] = useState(null)
   const [areas, setAreas] = useState([])
+  const [groups, setGroups] = useState([])
+  const isAdmin = profile.role === 'admin'
   const [error, setError] = useState(null)
   const [saved, setSaved] = useState(null)
 
   const load = useCallback(async () => {
     try {
-      const [p, a] = await Promise.all([getProfiles(), getSkillAreas()])
-      setPeople(p); setAreas(a)
+      const [p, a, g] = await Promise.all([getProfiles(), getSkillAreas(), getGroups()])
+      // Leads manage only people in the groups they lead
+      const led = new Set(g.filter((x) => profile.leadGroupIds.includes(x.id)).flatMap((x) => x.members.map((m) => m.user_id)))
+      setPeople(isAdmin ? p : p.filter((x) => led.has(x.id) && x.id !== profile.id))
+      setAreas(a); setGroups(g)
     } catch (e) { setError(e) }
-  }, [])
+  }, [isAdmin, profile.id, profile.leadGroupIds])
   useEffect(() => { load() }, [load])
 
   async function save(p, fields) {
@@ -29,19 +34,22 @@ export default function Members({ profile }) {
   }
 
   if (!people) return error ? <ErrorNote error={error} /> : <Spinner />
+  const groupNames = (id) => groups.filter((g) => g.members.some((m) => m.user_id === id)).map((g) => g.name).join(', ')
 
   return (
     <div className="flex flex-col gap-6">
       <header>
         <h1 className="m-0 font-display text-3xl">Team Members</h1>
-        <p className="mt-1.5 mb-0 text-muted text-sm">Trainers join by creating an account with their @{ALLOWED_DOMAIN} email. Set each trainer's daily LeetCode target here.</p>
+        <p className="mt-1.5 mb-0 text-muted text-sm">{isAdmin
+          ? <>Trainers join by creating an account with their @{ALLOWED_DOMAIN} email. Set each trainer's daily LeetCode target here, and put them into teams on the <a href="#/groups" className="text-accent">Groups</a> page.</>
+          : <>Members of the group{profile.leadGroupIds.length === 1 ? '' : 's'} you lead. Set each person's daily LeetCode target here.</>}</p>
       </header>
       <ErrorNote error={error} />
       <section className="card px-6 py-5 overflow-x-auto">
         <table className="w-full border-collapse text-sm min-w-[760px]">
           <thead>
             <tr className="text-left text-muted text-xs uppercase tracking-wide">
-              {['Name', 'Email', 'LeetCode', 'Daily target', 'Role', 'Joined'].map((h) => <th key={h} className="py-2.5 px-2 border-b border-line font-semibold">{h}</th>)}
+              {['Name', 'Email', 'Groups', 'LeetCode', 'Daily target', 'Role', 'Joined'].map((h) => <th key={h} className="py-2.5 px-2 border-b border-line font-semibold">{h}</th>)}
             </tr>
           </thead>
           <tbody>
@@ -49,6 +57,7 @@ export default function Members({ profile }) {
               <tr key={p.id}>
                 <td className="py-2 px-2 border-b border-soft font-semibold">{p.full_name || '—'}</td>
                 <td className="py-2 px-2 border-b border-soft text-muted">{p.email}</td>
+                <td className="py-2 px-2 border-b border-soft text-muted">{groupNames(p.id) || <span className="text-[#8A90A0]">None</span>}</td>
                 <td className="py-2 px-2 border-b border-soft">{p.leetcode_username ? `@${p.leetcode_username}` : <span className="text-[#8A90A0]">Not linked</span>}</td>
                 <td className="py-2 px-2 border-b border-soft">
                   <label className="sr-only" htmlFor={`t-${p.id}`}>Daily target for {p.full_name}</label>
@@ -59,18 +68,21 @@ export default function Members({ profile }) {
                 </td>
                 <td className="py-2 px-2 border-b border-soft">
                   <label className="sr-only" htmlFor={`r-${p.id}`}>Role for {p.full_name}</label>
-                  <select id={`r-${p.id}`} className="input w-32" value={p.role} onChange={(e) => save(p, { role: e.target.value })}>
-                    <option value="trainer">Trainer</option>
-                    <option value="admin">Admin</option>
-                  </select>
+                  {isAdmin ? (
+                    <select id={`r-${p.id}`} className="input w-32" value={p.role} onChange={(e) => save(p, { role: e.target.value })}>
+                      <option value="trainer">Trainer</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  ) : <span id={`r-${p.id}`} className="capitalize">{p.role}</span>}
                 </td>
                 <td className="py-2 px-2 border-b border-soft text-muted">{fmtDate(p.created_at)}</td>
               </tr>
             ))}
+            {people.length === 0 && <tr><td colSpan={7} className="py-4 px-2 text-muted">No members yet.</td></tr>}
           </tbody>
         </table>
       </section>
-      <SkillAreas areas={areas} onChange={load} />
+      {isAdmin && <SkillAreas areas={areas} onChange={load} />}
     </div>
   )
 }

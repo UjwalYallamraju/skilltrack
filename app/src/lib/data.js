@@ -52,6 +52,30 @@ export const deleteSolve = (id) => q(supabase.from('leetcode_solves').delete().e
 export const updateProfile = (id, fields) =>
   q(supabase.from('profiles').update(fields).eq('id', id).select().single())
 
+// ---------- Groups ----------
+// Returns the groups I can see, each with members: [{ user_id, is_lead }]
+export const getGroups = () =>
+  q(supabase.from('groups').select('*, members:group_members(user_id, is_lead)').order('name'))
+
+export const getMyMemberships = (userId) =>
+  q(supabase.from('group_members').select('group_id, is_lead, group:groups(name)').eq('user_id', userId))
+
+export const saveGroup = ({ id, name, description }) =>
+  id
+    ? q(supabase.from('groups').update({ name, description }).eq('id', id).select().single())
+    : q(supabase.from('groups').insert({ name, description }).select().single())
+
+export const deleteGroup = (id) => q(supabase.from('groups').delete().eq('id', id))
+
+export const addGroupMembers = (groupId, userIds) =>
+  q(supabase.from('group_members').upsert(userIds.map((user_id) => ({ group_id: groupId, user_id })), { onConflict: 'group_id,user_id', ignoreDuplicates: true }))
+
+export const removeGroupMember = (groupId, userId) =>
+  q(supabase.from('group_members').delete().eq('group_id', groupId).eq('user_id', userId))
+
+export const setGroupLead = (groupId, userId, isLead) =>
+  q(supabase.from('group_members').update({ is_lead: isLead }).eq('group_id', groupId).eq('user_id', userId))
+
 // Ask the server to pull fresh numbers from LeetCode (Edge Function "leetcode-sync")
 export async function syncLeetcode(userId) {
   const { data, error } = await supabase.functions.invoke('leetcode-sync', { body: userId ? { user_id: userId } : {} })
