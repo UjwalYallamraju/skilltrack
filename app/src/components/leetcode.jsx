@@ -7,7 +7,7 @@ import { mondayOf } from '../lib/insights'
 import { Badge, Button, Card, ErrorNote, Modal, useFeedback } from './ui'
 
 // Sequential single-hue ramp (light -> dark) for "problems solved that day"
-const HEAT = ['#EEF0F4', '#C7D2FE', '#818CF8', '#4F46E5', '#312E81']
+const HEAT = [0, 1, 2, 3, 4].map((i) => `var(--color-heat-${i})`)
 const heatColor = (n, target) => {
   if (n === 0) return HEAT[0]
   const t = Math.max(1, target || 1)
@@ -41,18 +41,17 @@ export function Heatmap({ personId, solves, target = 1, weeks = 26, joined }) {
       </div>
       <div className="relative overflow-x-auto">
         <svg width={weeks * (C + G) + 28} height={7 * (C + G) + 18} role="img" aria-label={`LeetCode activity: ${total} problems in ${weeks} weeks`}>
-          {['Mon', 'Wed', 'Fri'].map((l, i) => <text key={l} x="0" y={18 + (i * 2) * (C + G) + 10} fontSize="10" fill="#9CA3AF">{l}</text>)}
+          {['Mon', 'Wed', 'Fri'].map((l, i) => <text key={l} x="0" y={18 + (i * 2) * (C + G) + 10} fontSize="10" style={{ fill: 'var(--color-faint)' }}>{l}</text>)}
           {cols.map((col, w) => (
             <g key={w} transform={`translate(${28 + w * (C + G)}, 16)`}>
-              {(w === 0 || col[0].slice(8, 10) <= '07') && <text x="0" y="-5" fontSize="10" fill="#9CA3AF">{fmtDate(col[0], { month: 'short' })}</text>}
+              {(w === 0 || col[0].slice(8, 10) <= '07') && <text x="0" y="-5" fontSize="10" style={{ fill: 'var(--color-faint)' }}>{fmtDate(col[0], { month: 'short' })}</text>}
               {col.map((day, d) => {
                 if (day > today) return null
                 const n = counts.get(day) || 0
                 const before = joined && day < joined
                 return (
                   <rect key={day} x="0" y={d * (C + G)} width={C} height={C} rx="3"
-                    fill={before ? '#F9FAFB' : heatColor(n, target)}
-                    stroke={day === today ? '#111827' : 'none'} strokeWidth="1.2"
+                    style={{ fill: before ? 'var(--color-heat-pre)' : heatColor(n, target), stroke: day === today ? 'var(--color-ink)' : 'none' }} strokeWidth="1.2"
                     onMouseEnter={() => setTip({ x: 28 + w * (C + G), y: 16 + d * (C + G), text: `${weekdayShort(day)} ${fmtDate(day)}: ${n} problem${n === 1 ? '' : 's'}${isWeekend(day) ? ' (weekend)' : ''}` })}
                     onMouseLeave={() => setTip(null)} />
                 )
@@ -73,7 +72,7 @@ export function WeekBars({ days, target = 1 }) {
     <div className="flex items-end gap-[3px] h-6" role="img" aria-label={`Last 7 days: ${days.map((d) => d.n).join(', ')}`}>
       {days.map((d) => (
         <span key={d.day} title={`${weekdayShort(d.day)}: ${d.n}`} className="w-2 rounded-[2px]"
-          style={{ height: d.n ? Math.max(5, Math.round((d.n / max) * 24)) : 3, background: d.n === 0 ? (isWeekend(d.day) ? '#F3F4F6' : '#E5E7EB') : d.n >= target ? '#4F46E5' : '#A5B4FC' }} />
+          style={{ height: d.n ? Math.max(5, Math.round((d.n / max) * 24)) : 3, background: d.n === 0 ? (isWeekend(d.day) ? 'var(--color-soft)' : 'var(--color-line)') : d.n >= target ? 'var(--color-bar-hit)' : 'var(--color-bar-low)' }} />
       ))}
     </div>
   )

@@ -26,8 +26,8 @@ function Grid({ max, fmt }) {
     const y = M.top + IH - (t / max) * IH
     return (
       <g key={t}>
-        <line x1={M.left} x2={W - M.right} y1={y} y2={y} stroke="#EEF0F4" strokeWidth="1" />
-        <text x={M.left - 8} y={y + 4} textAnchor="end" fontSize="11" fill="#5B6170">{fmt ? fmt(t) : Math.round(t)}</text>
+        <line x1={M.left} x2={W - M.right} y1={y} y2={y} style={{ stroke: 'var(--color-grid)' }} strokeWidth="1" />
+        <text x={M.left - 8} y={y + 4} textAnchor="end" fontSize="11" style={{ fill: 'var(--color-axis-text)' }}>{fmt ? fmt(t) : Math.round(t)}</text>
       </g>
     )
   })
@@ -101,7 +101,7 @@ export function BarChart({ labels, series, ariaLabel, unit = '' }) {
       <div className="relative">
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto block" role="img" aria-label={ariaLabel} onMouseLeave={() => setTip(null)}>
           <Grid max={max} />
-          <line x1={M.left} x2={W - M.right} y1={M.top + IH} y2={M.top + IH} stroke="#D5D9E1" />
+          <line x1={M.left} x2={W - M.right} y1={M.top + IH} y2={M.top + IH} style={{ stroke: 'var(--color-axis)' }} />
           {labels.map((l, i) => {
             const cx = M.left + step * i + step / 2
             let y = M.top + IH
@@ -119,7 +119,7 @@ export function BarChart({ labels, series, ariaLabel, unit = '' }) {
                   const r = Math.min(4, rect.h)
                   return <path key={s.label} fill={s.color} d={`M${rect.x},${rect.y + rect.h} V${rect.y + r} Q${rect.x},${rect.y} ${rect.x + r},${rect.y} H${rect.x + rect.w - r} Q${rect.x + rect.w},${rect.y} ${rect.x + rect.w},${rect.y + r} V${rect.y + rect.h} Z`} />
                 })}
-                {i % labelEvery === 0 && <text x={cx} y={H - 10} textAnchor="middle" fontSize="11" fill="#5B6170">{l}</text>}
+                {i % labelEvery === 0 && <text x={cx} y={H - 10} textAnchor="middle" fontSize="11" style={{ fill: 'var(--color-axis-text)' }}>{l}</text>}
                 {/* hit target: the full column */}
                 <rect x={cx - step / 2} y={M.top} width={step} height={IH} fill="transparent"
                   onMouseEnter={() => setTip({ x: (cx / W) * 100, title: l, rows: [...series.map((s) => ({ label: s.label, color: series.length > 1 ? s.color : null, value: `${s.values[i] || 0}${unit}` })), ...(series.length > 1 ? [{ label: 'Total', value: `${totals[i]}${unit}` }] : [])] })} />
@@ -159,12 +159,12 @@ export function LineChart({ labels, series, ariaLabel, max: fixedMax, fmt = (v) 
         <svg ref={ref} viewBox={`0 0 ${W} ${H}`} className="w-full h-auto block" role="img" aria-label={ariaLabel}
           onMouseMove={move} onMouseLeave={() => setHover(null)}>
           <Grid max={max} fmt={fmt} />
-          <line x1={M.left} x2={W - M.right} y1={M.top + IH} y2={M.top + IH} stroke="#D5D9E1" />
+          <line x1={M.left} x2={W - M.right} y1={M.top + IH} y2={M.top + IH} style={{ stroke: 'var(--color-axis)' }} />
           {labels.map((l, i) => i % labelEvery === 0 && (
-            <text key={l} x={x(i)} y={H - 10} fontSize="11" fill="#5B6170"
+            <text key={l} x={x(i)} y={H - 10} fontSize="11" style={{ fill: 'var(--color-axis-text)' }}
               textAnchor={i === 0 && labels.length > 1 ? 'start' : i === labels.length - 1 ? 'end' : 'middle'}>{l}</text>
           ))}
-          {hover != null && <line x1={x(hover)} x2={x(hover)} y1={M.top} y2={M.top + IH} stroke="#8A90A0" strokeDasharray="3 3" />}
+          {hover != null && <line x1={x(hover)} x2={x(hover)} y1={M.top} y2={M.top + IH} style={{ stroke: 'var(--color-faint)' }} strokeDasharray="3 3" />}
           {series.map((s) => {
             // break the line where there is no data
             const parts = []
@@ -177,7 +177,7 @@ export function LineChart({ labels, series, ariaLabel, max: fixedMax, fmt = (v) 
                   ? <polyline key={k} points={p.map((q) => q.join(',')).join(' ')} fill="none" stroke={s.color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
                   : <circle key={k} cx={p[0][0]} cy={p[0][1]} r="3" fill={s.color} />)}
                 {hover != null && s.values[hover] != null && (
-                  <circle cx={x(hover)} cy={y(s.values[hover])} r="4.5" fill={s.color} stroke="#fff" strokeWidth="2" />
+                  <circle cx={x(hover)} cy={y(s.values[hover])} r="4.5" fill={s.color} style={{ stroke: 'var(--color-surface)' }} strokeWidth="2" />
                 )}
               </g>
             )

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
-  ChartColumn, ClipboardCheck, Code, House, LogOut, Menu, Search, Settings, Target, Users, X,
+  ChartColumn, ClipboardCheck, Code, House, LogOut, Menu, Monitor, Moon, Search, Settings, Sun, Target, Users, X,
 } from 'lucide-react'
 import { useMe } from '../lib/me'
 import { useGoals, useGroups, useProfiles } from '../lib/queries'
 import { scopeIds } from '../lib/insights'
+import { useTheme } from '../lib/theme'
 import { Avatar, Modal } from './ui'
 
 function useNav() {
@@ -68,6 +69,21 @@ function RoleSwitch() {
   )
 }
 
+function ThemeSwitch() {
+  const [choice, setChoice] = useTheme()
+  const opts = [['light', Sun, 'Light'], ['dark', Moon, 'Dark'], ['system', Monitor, 'System']]
+  return (
+    <div role="radiogroup" aria-label="Theme" className="grid grid-cols-3 gap-0.5 bg-soft p-0.5 rounded-lg">
+      {opts.map(([v, Icon, label]) => (
+        <button key={v} role="radio" aria-checked={choice === v} onClick={() => setChoice(v)} title={label === 'System' ? 'Match my device' : `${label} mode`}
+          className={`h-8 rounded-md text-xs flex items-center justify-center gap-1.5 cursor-pointer border-0 ${choice === v ? 'bg-white text-ink font-semibold shadow-sm' : 'bg-transparent text-muted hover:text-ink'}`}>
+          <Icon size={14} aria-hidden />{label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 function UserCard() {
   const { profile, isAdmin, isLead, mode, signOut } = useMe()
   const navigate = useNavigate()
@@ -88,7 +104,7 @@ function UserCard() {
 function SearchButton({ onOpen }) {
   const mac = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform)
   return (
-    <button onClick={onOpen} className="w-full h-9 flex items-center gap-2 px-3 rounded-lg border border-line bg-white text-muted text-[13px] cursor-pointer hover:border-[#D1D5DB]">
+    <button onClick={onOpen} className="w-full h-9 flex items-center gap-2 px-3 rounded-lg border border-line bg-white text-muted text-[13px] cursor-pointer hover:border-edge">
       <Search size={15} aria-hidden /><span className="flex-1 text-left">Find a person…</span>
       <kbd className="text-[11px] font-sans bg-soft rounded px-1.5 py-0.5">{mac ? '⌘' : 'Ctrl'} K</kbd>
     </button>
@@ -156,14 +172,14 @@ export default function Shell({ children }) {
       <Brand />
       <SearchButton onOpen={() => setSearch(true)} />
       <NavItems onNavigate={() => setDrawer(false)} />
-      <div className="mt-auto flex flex-col gap-3"><RoleSwitch /><UserCard /></div>
+      <div className="mt-auto flex flex-col gap-3"><ThemeSwitch /><RoleSwitch /><UserCard /></div>
     </div>
   )
 
   return (
     <div className="min-h-screen">
       {/* desktop sidebar */}
-      <aside className="no-print hidden lg:block fixed inset-y-0 left-0 w-[248px] border-r border-line bg-[#FBFBFC] px-4 py-5">{sidebar}</aside>
+      <aside className="no-print hidden lg:block fixed inset-y-0 left-0 w-[248px] border-r border-line bg-sidebar px-4 py-5">{sidebar}</aside>
 
       {/* mobile top bar */}
       <div className="no-print lg:hidden sticky top-0 z-30 flex items-center gap-2 h-14 px-3 bg-white/95 backdrop-blur border-b border-line">
@@ -173,7 +189,7 @@ export default function Shell({ children }) {
       </div>
       {drawer && (
         <div className="lg:hidden fixed inset-0 z-40 bg-[rgba(17,24,39,.4)]" onMouseDown={(e) => e.target === e.currentTarget && setDrawer(false)}>
-          <aside className="pop-in absolute inset-y-0 left-0 w-[280px] bg-[#FBFBFC] px-4 py-5 shadow-[var(--shadow-pop)]">
+          <aside className="pop-in absolute inset-y-0 left-0 w-[280px] bg-sidebar px-4 py-5 shadow-[var(--shadow-pop)]">
             <button onClick={() => setDrawer(false)} aria-label="Close menu" className="absolute right-3 top-4 w-9 h-9 rounded-lg flex items-center justify-center hover:bg-soft bg-transparent border-0 cursor-pointer"><X size={18} aria-hidden /></button>
             {sidebar}
           </aside>
