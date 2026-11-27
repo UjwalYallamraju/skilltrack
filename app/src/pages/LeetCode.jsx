@@ -41,7 +41,7 @@ export default function LeetCode() {
     for (const s of data.solves) { const k = `${s.user_id}|${s.solved_on}`; (solvesBy.get(k) || solvesBy.set(k, []).get(k)).push(s) }
     const goalTitle = new Map(data.goals.map((g) => [g.id, g.title]))
     for (const u of data.updates) { const k = `${u.user_id}|${istDay(u.created_at)}`; (updatesBy.get(k) || updatesBy.set(k, []).get(k)).push({ ...u, title: u.goal?.title || goalTitle.get(u.goal_id) || 'Goal' }) }
-    const people = data.people.filter((p) => ids.has(p.id)).map((p) => ({ p, joined: istDay(p.created_at), groups: groupsOf(p.id, data.groups), lc: idx.lcBy.get(p.id) }))
+    const people = data.people.filter((p) => ids.has(p.id)).map((p) => ({ p, joined: idx.startOf(p), groups: groupsOf(p.id, data.groups), lc: idx.lcBy.get(p.id) }))
     return {
       days, people, groups,
       solvesOf: (u, d) => solvesBy.get(`${u}|${d}`) || [],
